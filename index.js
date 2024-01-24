@@ -1,20 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
-import  express  from "express";
+import express from "express";
 import cors from "cors";
-const supabase = createClient("https://dgmvlwyaxmqsoixhuaoz.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnbXZsd3lheG1xc29peGh1YW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDUwNjIxOTYsImV4cCI6MjAyMDYzODE5Nn0.bsQfkT84K2_Qjcqe8C4J6RKkvHy1BY1Rpd1jZSNgy4Q");
+const supabase = createClient("https://cflpaggmcjhktbzgflfp.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmbHBhZ2dtY2poa3RiemdmbGZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDIyNTQyNjcsImV4cCI6MjAxNzgzMDI2N30._7DII_jn9HVnqMMvwSIHZoDicExFG2MtiWCuzhupgYc");
 
 const app = express();
-const port = 3020;
+const port = 3060;
 app.use(cors());
 app.use(express.json());
 
 // Fetch all chat messages for a specific user
-async function getChats(userId) {
+async function getChats(sender, receiver) {
   const { data, error } = await supabase
-  .from("chats")
-  .select("*")
-  .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
-  .order("created_at", { ascending: false });
+    .from("chats")
+    .select("*")
+    .or(`user1.eq.${sender},user2.eq.${sender}`)
+    .or(`user1.eq.${receiver},user2.eq.${receiver}`)
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.log("query error", error);
@@ -25,17 +26,12 @@ async function getChats(userId) {
 }
 
 // Insert a new chat message
-async function insertChatMessage(user1Id, user2Id, message) {
+async function insertChatMessage(insertData) {
+  const { user1, user2, content } = insertData;
+
   const { data, error } = await supabase
     .from("chats")
-    .insert([
-      {
-        user_id_1: String(BigInt(user1Id)),
-        user_id_2: String(BigInt(user2Id)),
-        message: message,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    .insert({ user1, user2, content }).select();
 
   console.log("Data:", data);
   console.log("Error:", error);
@@ -54,20 +50,19 @@ async function insertChatMessage(user1Id, user2Id, message) {
 }
 
 // API endpoint to get all chats for a specific user
-app.get("/getChats/:userId", cors(), async (req, res) => {
-  const userId = req.params.userId;
-  const chats = await getChats(userId);
-  res.json(chats);
+app.get("/chats/:sender/:receiver", cors(), async (req, res) => {
+  console.log("Received request:", req.params); // Add this line for logging
+  const chats = await getChats(req.params.sender, req.params.receiver);
+  res.status(200).json(chats);
 });
 
 // API endpoint to send a new chat message
-app.post("/sendMessage", cors(), async (req, res) => {
+app.post("/chats", cors(), async (req, res) => {
   try {
-    console.log("Received request:", req.body); // Add this line for logging
-    const { user1Id, user2Id, message } = req.body;
-    const newMessage = await insertChatMessage(user1Id, user2Id, message);
+    console.log("POST Received request:", req.body); // Add this line for logging
+    const newMessage = await insertChatMessage(req.body);
     console.log("Response sent:", newMessage); // Add this line for logging
-    res.json(newMessage);
+    res.status(200).json(newMessage);
   } catch (error) {
     console.error("Error in sendMessage endpoint:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -76,5 +71,5 @@ app.post("/sendMessage", cors(), async (req, res) => {
 
 
 app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`)
+  console.log(`Example app listening at http://localhost:${port}`)
 })
